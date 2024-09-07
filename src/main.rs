@@ -1,15 +1,16 @@
 #![deny(clippy::all)]
 #![warn(clippy::pedantic)]
 
+use anyhow::Context;
+use clap::Parser;
 use owo_colors::OwoColorize;
-
 use std::{
+    env,
     fs::{self},
     io::{self, ErrorKind},
-    path::{self, Path},
+    path::Path,
 };
-
-use clap::Parser;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// Checks if a directory or file is empty, or if a symbolic link points to a path that does not exist. Only supports UTF-8 paths.
 #[derive(Parser)]
@@ -19,25 +20,51 @@ struct EmpdArgs {
     #[arg(short, long)]
     delete_if_empty: bool,
     /// Path to test
-    #[arg(index = 1)]
+    #[arg(index = 1_usize)]
     path: String,
 }
 
 const CHECK_MARK: &str = "✔️";
 const X: &str = "🗙";
 
+fn main() -> Result<(), i32> {
+    // TODO
+    env::set_var("RUST_BACKTRACE", "1");
+    // TODO
+    env::set_var("RUST_LOG", "debug");
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer().pretty())
+        .init();
+
+    let result = start();
+
+    match result {
+        Ok(re) => re,
+        Err(er) => {
+            tracing::error!(
+                backtrace = %er.backtrace(),
+                error = %er,
+            );
+
+            Err(1_i32)
+        }
+    }
+}
+
 #[allow(clippy::too_many_lines)]
-fn main() {
+fn start() -> anyhow::Result<Result<(), i32>> {
     let EmpdArgs {
         delete_if_empty,
         path,
     } = EmpdArgs::parse();
 
-    let path_path = path::Path::new(&path);
+    let path_path = Path::new(&path);
 
     let path_path_str = path_path
         .to_str()
-        .expect("Could not convert path to a UTF-8 string");
+        .context("Could not convert path to a UTF-8 string")?;
 
     let result = fs::symlink_metadata(path_path);
 
@@ -46,48 +73,48 @@ fn main() {
             ErrorKind::NotFound => {
                 eprintln!("Path \"{}\" does not exist", path_path_str.bold());
 
-                11
+                Err(11_i32)
             }
             ErrorKind::PermissionDenied => {
                 eprintln!("Permission to path \"{}\" was denied", path_path_str.bold());
 
-                12
+                Err(12_i32)
             }
             _ => {
-                panic!("{er}");
+                anyhow::bail!(er);
             }
         },
         Ok(me) => {
             match me {
                 me if me.is_dir() => {
-                    let canonicalize_result = canonicalize(path_path_str, path_path)
-                        .expect("Could not canonicalize directory path");
+                    let canonicalize_result = canonicalize(path_path_str, path_path)?
+                        .context("Could not canonicalize directory path")?;
 
-                    let read_dir = path_path.read_dir().expect("Could not read directory");
+                    let read_dir = path_path.read_dir().context("Could not read directory")?;
 
-                    let mut directories = 0;
-                    let mut files = 0;
-                    let mut symlinks = 0;
+                    let mut directories = 0_u32;
+                    let mut files = 0_u32;
+                    let mut symlinks = 0_u32;
 
                     for re in read_dir {
-                        let di = re.expect("Could not access directory entry");
+                        let di = re.context("Could not access directory entry")?;
 
                         let fi = di
                             .file_type()
-                            .expect("Could not get the directory entry's file type");
+                            .context("Could not get the directory entry's file type")?;
 
                         match fi {
                             fi if fi.is_dir() => {
-                                directories += 1;
+                                directories += 1_u32;
                             }
                             fi if fi.is_file() => {
-                                files += 1;
+                                files += 1_u32;
                             }
                             fi if fi.is_symlink() => {
-                                symlinks += 1;
+                                symlinks += 1_u32;
                             }
                             _ => {
-                                panic!(
+                                anyhow::bail!(
                                     "Encountered directory entry that is not a directory, file, or symlink"
                                 );
                             }
@@ -96,7 +123,7 @@ fn main() {
 
                     let total_items = directories + files + symlinks;
 
-                    if total_items > 0 {
+                    if total_items > 0_u32 {
                         println!(
                             " {}  Path \"{}\" is a {} (directories: {}, files: {}, symlinks: {}, total items: {})",
                             X.bold().red(),
@@ -108,7 +135,7 @@ fn main() {
                             bold_if_greater_than_zero(total_items)
                         );
 
-                        31
+                        Err(31_i32)
                     } else {
                         println!(
                             " {}  Path \"{}\" is an {}",
@@ -126,37 +153,35 @@ fn main() {
 
                             let input = &mut String::new();
 
-                            io::stdin()
-                                .read_line(input)
-                                .expect("\"read_line\" call failed");
+                            io::stdin().read_line(input)?;
 
                             if input == "y\n" {
                                 // TODO Status of path could have changed by now
-                                fs::remove_dir(path_path).unwrap();
+                                fs::remove_dir(path_path)?;
 
                                 println!(
                                     "Deleted empty directory \"{}\"",
                                     canonicalize_result.bold()
                                 );
 
-                                0
+                                Ok(())
                             } else {
                                 println!("Input was not \"y\", not deleting empty directory");
 
-                                32
+                                Err(32_i32)
                             }
                         } else {
-                            0
+                            Ok(())
                         }
                     }
                 }
                 me if me.is_file() => {
-                    let canonicalize_result = canonicalize(path_path_str, path_path)
-                        .expect("Could not canonicalize file path");
+                    let canonicalize_result = canonicalize(path_path_str, path_path)?
+                        .context("Could not canonicalize file path")?;
 
                     let len = me.len();
 
-                    if len > 0 {
+                    if len > 0_u64 {
                         println!(
                             " {}  Path \"{}\" is a {} (bytes: {})",
                             X.bold().red(),
@@ -165,7 +190,7 @@ fn main() {
                             len.bold()
                         );
 
-                        21
+                        Err(21_i32)
                     } else {
                         println!(
                             " {}  Path \"{}\" is an {}",
@@ -183,36 +208,35 @@ fn main() {
 
                             let input = &mut String::new();
 
-                            io::stdin()
-                                .read_line(input)
-                                .expect("\"read_line\" call failed");
+                            io::stdin().read_line(input)?;
 
                             if input == "y\n" {
                                 // TODO Status of path could have changed by now
-                                fs::remove_file(path_path).unwrap();
+                                fs::remove_file(path_path)?;
 
                                 println!("Deleted empty file \"{}\"", canonicalize_result.bold());
 
-                                0
+                                Ok(())
                             } else {
                                 println!("Input was not \"y\", not deleting empty file");
 
-                                22
+                                Err(22_i32)
                             }
                         } else {
-                            0
+                            Ok(())
                         }
                     }
                 }
                 me if me.is_symlink() => {
-                    let link_path_buf =
-                        path_path.read_link().expect("Could not read symbolic link");
+                    let link_path_buf = path_path
+                        .read_link()
+                        .context("Could not read symbolic link")?;
 
                     let link_path_buf_str = link_path_buf
                         .to_str()
-                        .expect("Could not convert symbolic link path to a UTF-8 string");
+                        .context("Could not convert symbolic link path to a UTF-8 string")?;
 
-                    let canonicalize_result = canonicalize(path_path_str, path_path);
+                    let canonicalize_result = canonicalize(path_path_str, path_path)?;
 
                     #[allow(clippy::single_match_else)]
                     {
@@ -225,7 +249,7 @@ fn main() {
                                     link_path_buf_str.bold()
                                 );
 
-                                41
+                                Err(41_i32)
                             }
                             None => {
                                 println!(
@@ -245,62 +269,61 @@ fn main() {
 
                                     let input = &mut String::new();
 
-                                    io::stdin()
-                                        .read_line(input)
-                                        .expect("\"read_line\" call failed");
+                                    io::stdin().read_line(input)?;
 
                                     if input == "y\n" {
-                                        // TODO Status of path could have changed by now
-                                        fs::remove_file(path_path).unwrap();
+                                        // TODO
+                                        // Status of path could have changed by now
+                                        fs::remove_file(path_path)?;
 
                                         println!(
                                             "Deleted symbolic link \"{}\" (non-canonicalized)",
                                             path_path_str.bold()
                                         );
 
-                                        0
+                                        Ok(())
                                     } else {
                                         println!("Input was not \"y\", not deleting symbolic link");
 
-                                        42
+                                        Err(42_i32)
                                     }
                                 } else {
-                                    0
+                                    Ok(())
                                 }
                             }
                         }
                     }
                 }
                 _ => {
-                    panic!("Path \"{path_path_str}\" is not a directory, file, or symlink")
+                    anyhow::bail!("Path \"{path_path_str}\" is not a directory, file, or symlink")
                 }
             }
         }
     };
 
-    if exit_code != 0 {
-        eprintln!("Exiting with non-zero exit code {}", exit_code.bold());
+    if let Err(it) = exit_code {
+        eprintln!("Exiting with non-zero exit code {}", it.bold());
     }
 
-    std::process::exit(exit_code);
+    Ok(exit_code)
 }
 
-fn bold_if_greater_than_zero(input: i32) -> String {
-    if input > 0 {
+fn bold_if_greater_than_zero(input: u32) -> String {
+    if input > 0_u32 {
         input.bold().to_string()
     } else {
         input.to_string()
     }
 }
 
-fn canonicalize(path_str: &str, path_path: &Path) -> Option<String> {
+fn canonicalize(path_str: &str, path_path: &Path) -> anyhow::Result<Option<String>> {
     let canonicalize_result = fs::canonicalize(path_path);
 
-    let option: Option<String> = match canonicalize_result {
+    let option = match canonicalize_result {
         Ok(pa) => {
             let path_buf_str = pa
                 .to_str()
-                .expect("Could not convert path to a UTF-8 string");
+                .context("Could not convert path to a UTF-8 string")?;
 
             eprintln!(
                 "Canonicalized input path \"{}\" to \"{}\"",
@@ -320,10 +343,10 @@ fn canonicalize(path_str: &str, path_path: &Path) -> Option<String> {
                 None
             }
             _ => {
-                panic!("{er}");
+                anyhow::bail!(er);
             }
         },
     };
 
-    option
+    Ok(option)
 }

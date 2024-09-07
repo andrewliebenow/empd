@@ -1,4 +1,8 @@
 [dependencies]
+anyhow = {default-features = false, features = [
+  "backtrace",
+  "std"
+], version = "=1.0.87"}
 clap = {default-features = false, features = [
   "color",
   "derive",
@@ -6,8 +10,16 @@ clap = {default-features = false, features = [
   "std",
   "suggestions",
   "usage"
-], version = "=4.5.4"}
-owo-colors = "=4.0.0"
+], version = "=4.5.17"}
+owo-colors = {default-features = false, version = "=4.0.0"}
+tracing = {default-features = false, version = "=0.1.40"}
+tracing-subscriber = {default-features = false, features = [
+  "ansi",
+  "env-filter",
+  "fmt",
+  "std",
+  "tracing-log"
+], version = "=0.3.18"}
 
 [package]
 edition = "2021"
@@ -17,5 +29,5 @@ version = "0.1.0"
 
 [profile.release]
 codegen-units = 1
-lto = true
-strip = true
+lto = "fat"
+strip = "symbols"
