@@ -66,9 +66,9 @@ fn start() -> anyhow::Result<Result<(), i32>> {
         .to_str()
         .context("Could not convert path to a UTF-8 string")?;
 
-    let result = fs::symlink_metadata(path_path);
+    let symlink_metadata_result = fs::symlink_metadata(path_path);
 
-    let exit_code = match result {
+    let result = match symlink_metadata_result {
         Err(er) => match er.kind() {
             ErrorKind::NotFound => {
                 eprintln!("Path \"{}\" does not exist", path_path_str.bold());
@@ -301,11 +301,11 @@ fn start() -> anyhow::Result<Result<(), i32>> {
         }
     };
 
-    if let Err(it) = exit_code {
+    if let Err(it) = result {
         eprintln!("Exiting with non-zero exit code {}", it.bold());
     }
 
-    Ok(exit_code)
+    Ok(result)
 }
 
 fn bold_if_greater_than_zero(input: u32) -> String {
