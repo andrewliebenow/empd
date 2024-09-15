@@ -2,7 +2,7 @@
 anyhow = {default-features = false, features = [
   "backtrace",
   "std"
-], version = "=1.0.87"}
+], version = "=1.0.89"}
 clap = {default-features = false, features = [
   "color",
   "derive",
@@ -11,7 +11,7 @@ clap = {default-features = false, features = [
   "suggestions",
   "usage"
 ], version = "=4.5.17"}
-owo-colors = {default-features = false, version = "=4.0.0"}
+owo-colors = {default-features = false, version = "=4.1.0"}
 tracing = {default-features = false, version = "=0.1.40"}
 tracing-subscriber = {default-features = false, features = [
   "ansi",
