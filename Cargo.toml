@@ -1,25 +1,25 @@
 [dependencies]
-anyhow = {default-features = false, features = [
+anyhow = { default-features = false, features = [
   "backtrace",
-  "std"
-], version = "=1.0.89"}
-clap = {default-features = false, features = [
+  "std",
+], version = "=1.0.89" }
+clap = { default-features = false, features = [
   "color",
   "derive",
   "help",
   "std",
   "suggestions",
-  "usage"
-], version = "=4.5.17"}
-owo-colors = {default-features = false, version = "=4.1.0"}
-tracing = {default-features = false, version = "=0.1.40"}
-tracing-subscriber = {default-features = false, features = [
+  "usage",
+], version = "=4.5.20" }
+owo-colors = { default-features = false, version = "=4.1.0" }
+tracing = { default-features = false, version = "=0.1.40" }
+tracing-subscriber = { default-features = false, features = [
   "ansi",
   "env-filter",
   "fmt",
   "std",
-  "tracing-log"
-], version = "=0.3.18"}
+  "tracing-log",
+], version = "=0.3.18" }
 
 [package]
 edition = "2021"
